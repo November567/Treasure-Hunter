@@ -79,8 +79,18 @@ def draw_grid(screen, state, fonts, hmm_display):
         for c in range(GRID_SIZE):
             rect = crect(r, c)
             ct       = state.grid[r][c]
-            revealed = (r, c) in state.revealed_bombs and ct == BOMB
-            col      = C["bomb"] if revealed else CELL_COL_VIS.get(ct, C["empty"])
+            revealed_bomb = (r, c) in state.revealed_bombs and ct == BOMB
+            # Gem is visible if: on the grid unrevealed=hidden, OR just collected (in flash)
+            gem_visible = (r, c) in state.revealed_gems
+
+            if revealed_bomb:
+                col = C["bomb"]
+            elif ct == TREASURE and not gem_visible:
+                col = C["empty"]   # hidden until discovered
+            elif ct == EMPTY and gem_visible:
+                col = C["treasure"]  # just collected — show during flash
+            else:
+                col = CELL_COL_VIS.get(ct, C["empty"])
 
             fk = (r, c)
             if fk in state.flash:
@@ -88,7 +98,14 @@ def draw_grid(screen, state, fonts, hmm_display):
 
             rr(screen, col, rect, rad=8, border=C["grid_line"])
 
-            lbl = "💣" if revealed else CELL_LBL_VIS.get(ct, "")
+            if revealed_bomb:
+                lbl = "💣"
+            elif ct == TREASURE and not gem_visible:
+                lbl = ""           # invisible
+            elif ct == EMPTY and gem_visible:
+                lbl = "GEM"        # show briefly after collection
+            else:
+                lbl = CELL_LBL_VIS.get(ct, "")
             if lbl:
                 ts = fonts["cell"].render(lbl, True, C["bg"])
                 screen.blit(ts, ts.get_rect(center=rect.center))

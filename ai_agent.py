@@ -8,6 +8,7 @@ Contains:
 """
 
 import heapq
+import random
 from constants import GRID_SIZE, EMPTY, WALL, TREASURE, WEAPON, HMM_ITEM, DIRS, MINIMAX_DEPTH
 
 
@@ -155,12 +156,29 @@ def minimax(grid, p_pos, p_score, p_weapon,
 
 # ── AI decision entry point ──────────────────────────────────────────────────
 
+def _explore_move(grid, a_pos, ai_visited):
+    """Pick a random unvisited neighbour; if all visited, clear history and pick any."""
+    moves = _valid_moves(grid, a_pos)
+    if not moves:
+        return None, []
+    unvisited = [(dr, dc) for dr, dc in moves
+                 if (a_pos[0] + dr, a_pos[1] + dc) not in ai_visited]
+    if not unvisited:
+        ai_visited.clear()
+        unvisited = moves
+    dr, dc = random.choice(unvisited)
+    return (a_pos[0] + dr, a_pos[1] + dc), []
+
+
 def ai_decide(grid, p_pos, p_score, p_weapon,
-              a_pos, a_score, a_weapon, known_bombs=None):
+              a_pos, a_score, a_weapon, known_bombs=None, ai_visited=None):
     """
     Choose the best next position for the AI.
     Returns (next_pos, full_path).
     """
+    if ai_visited is None:
+        ai_visited = set()
+
     candidates = [(r, c) for r in range(GRID_SIZE)
                           for c in range(GRID_SIZE)
                           if grid[r][c] in (TREASURE, WEAPON, HMM_ITEM)]
@@ -168,11 +186,7 @@ def ai_decide(grid, p_pos, p_score, p_weapon,
     hunt_target = tuple(p_pos) if a_weapon else None
 
     if not candidates and not hunt_target:
-        moves = _valid_moves(grid, a_pos)
-        if not moves:
-            return None, []
-        dr, dc = moves[0]
-        return (a_pos[0] + dr, a_pos[1] + dc), []
+        return _explore_move(grid, a_pos, ai_visited)
 
     best_val, best_target = -10000, None
 
@@ -194,11 +208,7 @@ def ai_decide(grid, p_pos, p_score, p_weapon,
             best_val, best_target = val, hunt_target
 
     if best_target is None:
-        moves = _valid_moves(grid, a_pos)
-        if not moves:
-            return None, []
-        dr, dc = moves[0]
-        return (a_pos[0] + dr, a_pos[1] + dc), []
+        return _explore_move(grid, a_pos, ai_visited)
 
     path = astar_ai(grid, tuple(a_pos), best_target, known_bombs)
     if len(path) >= 2:

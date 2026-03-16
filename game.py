@@ -37,7 +37,9 @@ class GameState:
         self.ai_hmm_turns     = 0
         self.ai_hmm_belief    = {}      # (r,c) → P(bomb) from AI's scans
 
+        self.revealed_gems   = set()   # gem cells made visible after first collision
         self.sounds          = {}      # populated by main.py after pygame.mixer init
+        self.ai_visited      = set()   # cells visited during random-walk exploration
 
         # Player HMM
         self.hmm              = HMMDetector(self.grid)
@@ -73,6 +75,7 @@ class GameState:
 
         if ct == TREASURE:
             self._play("coin")
+            self.revealed_gems.add((r, c))
             self.player.score += 10
             self.grid[r][c] = EMPTY
             self.hmm.mark_safe(r, c)
@@ -187,6 +190,7 @@ class GameState:
 
         if ct == TREASURE:
             self._play("coin")
+            self.revealed_gems.add((r, c))
             self.ai.score += 10; self.grid[r][c] = EMPTY
             self.add_log("AI: +10 💎 Treasure!", "log_treas")
             self.flash[(r, c)] = 14
@@ -297,11 +301,21 @@ class GameState:
     # ── AI move ──────────────────────────────────────────────────────────────
 
     def ai_move(self):
+        # Mask unrevealed gems so AI has no knowledge of them
+        masked = [row[:] for row in self.grid]
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if masked[r][c] == TREASURE and (r, c) not in self.revealed_gems:
+                    masked[r][c] = EMPTY
+
+        self.ai_visited.add(tuple(self.ai.pos))
+
         next_pos, path = ai_decide(
-            self.grid,
+            masked,
             self.player.pos, self.player.score, self.player.weapon,
             self.ai.pos,     self.ai.score,     self.ai.weapon,
             self.ai_known_bombs | self.revealed_bombs,
+            self.ai_visited,
         )
         self.ai_path = path
         if next_pos:
